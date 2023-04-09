@@ -7,9 +7,10 @@ import edu.princeton.cs.algs4.WeightedQuickUnionUF;
  *  Last modified:     October 16, 1842
  **************************************************************************** */
 public class Percolation {
-    private int[][] sites;
+    private boolean[][] sites;
     private int openNumber = 0;
     private WeightedQuickUnionUF quickUnionUF;
+    private WeightedQuickUnionUF quickUnionUFForFull;
 
 
     // creates n-by-n grid, with all sites initially blocked
@@ -17,18 +18,15 @@ public class Percolation {
         if (n <= 0) {
             throw new IllegalArgumentException();
         }
-        sites = new int[n][n];
+        sites = new boolean[n][n];
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
-                sites[i][j] = 0;
+                sites[i][j] = false;
             }
         }
 
         quickUnionUF = new WeightedQuickUnionUF(n * n + 2);
-        for (int col = 1; col <= n; col++) {
-            // quickUnionUF.union(0, gridToIndex(1, col));
-            quickUnionUF.union(n * n + 1, gridToIndex(n, col));
-        }
+        quickUnionUFForFull = new WeightedQuickUnionUF(n * n + 1);
     }
 
     // opens the site (row, col) if it is not open already
@@ -42,26 +40,35 @@ public class Percolation {
 
         if (((row - 1) > 0) && isOpen(row - 1, col)) {
             quickUnionUF.union(gridToIndex(row, col), gridToIndex(row - 1, col));
+            quickUnionUFForFull.union(gridToIndex(row, col), gridToIndex(row - 1, col));
         }
 
         if (((row + 1) <= sites.length) && isOpen(row + 1, col)) {
             quickUnionUF.union(gridToIndex(row, col), gridToIndex(row + 1, col));
+            quickUnionUFForFull.union(gridToIndex(row, col), gridToIndex(row + 1, col));
         }
 
         if (((col - 1) > 0) && isOpen(row, col - 1)) {
             quickUnionUF.union(gridToIndex(row, col), gridToIndex(row, col - 1));
+            quickUnionUFForFull.union(gridToIndex(row, col), gridToIndex(row, col - 1));
         }
 
         if (((col + 1) <= sites.length) && isOpen(row, col + 1)) {
             quickUnionUF.union(gridToIndex(row, col), gridToIndex(row, col + 1));
+            quickUnionUFForFull.union(gridToIndex(row, col), gridToIndex(row, col + 1));
         }
 
         if (row == 1) {
             quickUnionUF.union(0, gridToIndex(row, col));
+            quickUnionUFForFull.union(0, gridToIndex(row, col));
+        }
+
+        if (row == sites.length) {
+            quickUnionUF.union(sites.length * sites.length + 1, gridToIndex(row, col));
         }
 
         openNumber++;
-        sites[row - 1][col - 1] = 1;
+        sites[row - 1][col - 1] = true;
     }
 
     // is the site (row, col) open?
@@ -69,7 +76,7 @@ public class Percolation {
         if (isInvalidArgument(row) || isInvalidArgument(col)) {
             throw new IllegalArgumentException();
         }
-        return sites[row - 1][col - 1] == 1;
+        return sites[row - 1][col - 1];
     }
 
     // is the site (row, col) full?
@@ -77,7 +84,8 @@ public class Percolation {
         if (isInvalidArgument(row) || isInvalidArgument(col)) {
             throw new IllegalArgumentException();
         }
-        return isOpen(row, col) && (quickUnionUF.find(0) == quickUnionUF.find(gridToIndex(row, col)));
+        return isOpen(row, col) &&
+              (quickUnionUFForFull.find(0) == quickUnionUFForFull.find(gridToIndex(row, col)));
     }
 
     // returns the number of open sites
@@ -102,8 +110,8 @@ public class Percolation {
             }
             p.open(row, col);
             System.out.println("row: " + row + " col: " + col
-                                       + " isOpen: " + p.isOpen(row,col)
-                                       + " isFull: " + p.isFull(row,col)
+                                       + " isOpen: " + p.isOpen(row, col)
+                                       + " isFull: " + p.isFull(row, col)
                                        + " numberOfOpenSites: " + p.numberOfOpenSites()
                                        + " percolates: " + p.percolates());
         }

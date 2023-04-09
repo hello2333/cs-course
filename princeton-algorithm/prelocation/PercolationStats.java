@@ -8,6 +8,7 @@ import edu.princeton.cs.algs4.StdRandom;
 import edu.princeton.cs.algs4.StdStats;
 
 public class PercolationStats {
+    private static final double CONFIDENCE_95 = 1.96;
     private double[] a;
     private double statMean = 0;
     private double statStddev = 0;
@@ -29,12 +30,12 @@ public class PercolationStats {
                 }
                 p.open(row, col);
             }
-            a[i] = p.numberOfOpenSites() / n;
+            a[i] = p.numberOfOpenSites() / (double) (n * n);
         }
         statMean = StdStats.mean(a);
         statStddev = StdStats.stddev(a);
-        statConfidenceLo = statMean - statStddev * 1.96 / Math.sqrt(trials);
-        statConfidenceHi = statMean + statStddev * 1.96 / Math.sqrt(trials);
+        statConfidenceLo = statMean - statStddev * CONFIDENCE_95 / Math.sqrt(trials);
+        statConfidenceHi = statMean + statStddev * CONFIDENCE_95 / Math.sqrt(trials);
     }
 
     // sample mean of percolation threshold
