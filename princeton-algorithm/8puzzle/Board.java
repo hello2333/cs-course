@@ -16,6 +16,10 @@ public class Board {
     private int blankRow = 0;
     private int hamming = 0;
     private int manhattan = 0;
+    private Board twinBoard = null;
+    private boolean isGoad = false;
+    private Iterable<Board> neighs = null;
+
     // create a board from an n-by-n array of tiles,
     // where tiles[row][col] = tile at (row, col)
     public Board(int[][] tiles) {
@@ -33,10 +37,15 @@ public class Board {
 
         updateHamming();
         updateManhattan();
+        isGoad = updateIsGoal();
     }
 
     // string representation of this board
     public String toString() {
+        return genBoardString();
+    }
+
+    private String genBoardString() {
         StringBuilder builder = new StringBuilder();
         builder.append(dimension());
         builder.append("\n");
@@ -109,6 +118,11 @@ public class Board {
 
     // is this board the goal board?
     public boolean isGoal() {
+        return isGoad;
+    }
+
+    // is this board the goal board?
+    private boolean updateIsGoal() {
         for (int i = 0; i < tiles.length; i++) {
             for (int j = 0; j < tiles[i].length; j++) {
                 int targetTile = getGoalTile(i, j);
@@ -136,14 +150,15 @@ public class Board {
         return false;
     }
 
-    // public int hashCode() {
-    //     int result = Objects.hash(blankCol, blankRow);
-    //     result = 31 * result + Arrays.deepHashCode(tiles);
-    //     return result;
-    // }
-
     // all neighboring boards
     public Iterable<Board> neighbors() {
+        if (this.neighs == null) {
+            this.neighs = updateNeighbors();
+        }
+        return this.neighs;
+    }
+
+    private Iterable<Board> updateNeighbors() {
         Queue<Board> neighs = new Queue<Board>();
         int[][] neighLoop = {
                 {-1, 0},
@@ -159,33 +174,41 @@ public class Board {
             if (!isValidPos(newRow, newCol)) {
                 continue;
             }
-            Board neighBoard = new Board(tiles);
-            // StdOut.printf("blankRow=%d, blankCol=%d, newRow=%d, newCol=%d\n", blankRow, blankCol, newRow, newCol);
-            swapTiles(neighBoard, blankRow, blankCol, newRow, newCol);
+
+            Board neighBoard = swapTiles(tiles, blankRow, blankCol, newRow, newCol);
             neighBoard.blankRow = newRow;
             neighBoard.blankCol = newCol;
             neighs.enqueue(neighBoard);
         }
-        // StdOut.println("calculate neigh end");
         return neighs;
     }
 
     // a board that is obtained by exchanging any pair of tiles
     public Board twin() {
-        Board twinBoard = new Board(tiles);
+        if (twinBoard == null) {
+            twinBoard = updateWwin();
+        }
+        return twinBoard;
+    }
+
+    private Board updateWwin() {
         while (true) {
             int newRow1 = StdRandom.uniformInt(dimension());
             int newCol1 = StdRandom.uniformInt(dimension());
 
             int newRow2 = StdRandom.uniformInt(dimension());
             int newCol2 = StdRandom.uniformInt(dimension());
-            swapTiles(twinBoard, newRow1, newCol1, newRow2, newCol2);
 
-            if (newRow1 != newRow2 || newCol1 != newCol2) {
-                break;
+            if (isBlank(newRow1, newCol1) || isBlank(newRow2, newCol2)) {
+                continue;
             }
+
+            if ((newRow1 == newRow2) && (newCol1 == newCol2)) {
+                continue;
+            }
+
+            return swapTiles(tiles, newRow1, newCol1, newRow2, newCol2);
         }
-        return twinBoard;
     }
 
     private int getGoalTile(int row, int col) {
@@ -207,12 +230,20 @@ public class Board {
     private boolean isValidDimension(int pos) {
         return pos >= 0 && pos < dimension();
     }
-    private void swapTiles(Board board, int row1, int col1, int row2, int col2) {
-        int temp = board.tiles[row1][col1];
-        board.tiles[row1][col1] = board.tiles[row2][col2];
-        board.tiles[row2][col2] = temp;
-        board.updateManhattan();
-        board.updateManhattan();
+
+    private Board swapTiles(int[][] originTiles, int row1, int col1, int row2, int col2) {
+        int[][] newTiles = new int[originTiles.length][originTiles.length];
+        for (int i = 0; i < originTiles.length; i++) {
+            for (int j = 0; j < originTiles[i].length; j++) {
+                newTiles[i][j] = originTiles[i][j];
+            }
+        }
+        int temp = newTiles[row1][col1];
+        newTiles[row1][col1] = newTiles[row2][col2];
+        newTiles[row2][col2] = temp;
+
+        Board board = new Board(newTiles);
+        return board;
     }
 
     private boolean isBlank(int row, int col) {
@@ -282,9 +313,9 @@ public class Board {
         Board anotherBoard = new Board(tiles);
         assert board.equals(anotherBoard) : "Equals failed";
 
-
+        StdOut.println("test neighs for board: \n" + board);
         for (Board neighbor : board.neighbors()) {
-            StdOut.println(neighbor.toString());
+            StdOut.println("neighs: \n" + neighbor);
         }
 
         // Test twin method
@@ -294,7 +325,7 @@ public class Board {
                 {7, 8, 0}
         };
         Board twinBoard = new Board(twinTiles);
-        StdOut.println(twinBoard.toString());
+        StdOut.println("twinTiles: \n" + twinBoard.twin());
 
         System.out.println("All tests passed!");
     }

@@ -39,41 +39,45 @@ public class Solver {
                 return o1.hammingPriority() - o2.hammingPriority();
             }
         });
+        MinPQ<SearchNode> frontierTwin = new MinPQ<>(new Comparator<SearchNode>() {
+            public int compare(SearchNode o1, SearchNode o2) {
+                return o1.hammingPriority() - o2.hammingPriority();
+            }
+        });
 
-        // Set<SearchNode> reachedBoards = new HashSet<>();
         SearchNode searchNodeInital = new SearchNode(initial, 0, null);
         frontier.insert(searchNodeInital);
-        // reachedBoards.add(searchNodeInital);
 
-        while (!frontier.isEmpty()) {
-            SearchNode node = frontier.delMin();
+        SearchNode searchNodeTwin = new SearchNode(initial.twin(), 0, null);
+        frontierTwin.insert(searchNodeTwin);
+
+        int loop = 0;
+        while (!frontier.isEmpty() && !frontierTwin.isEmpty()) {
+            boolean isTwin = loop++ % 2 != 0;
+            SearchNode node = isTwin ? frontierTwin.delMin() : frontier.delMin();
 
             if (node.board.isGoal()) {
+                if (isTwin) {
+                    return;
+                }
                 result = node;
                 return;
             }
 
-            // if (reachedBoards.contains(node)) {
-            //     if (node.moves > reachedBoards .get(node.board).intValue()) {
-            //         continue;
-            //     }
-            // }
-
             for (Board neighBoard : node.board.neighbors()) {
+                if (node.prev != null) {
+                    if (neighBoard.equals(node.prev.board)) {
+                        continue;
+                    }
+                }
                 int newMoves = node.moves + 1;
                 SearchNode neighSearch = new SearchNode(neighBoard, newMoves, node);
-                // if (!reachedBoards.containsKey(neighBoard)) {
-                //     reachedBoards.put(neighBoard, newMoves);
-                //     frontier.insert(neighSearch);
-                //     continue;
-                // }
-                frontier.insert(neighSearch);
 
-                // if (newMoves < reachedBoards.get(neighBoard).intValue()) {
-                //     reachedBoards.put(neighBoard, newMoves);
-                //     frontier.insert(neighSearch);
-                //     continue;
-                // }
+                if (isTwin) {
+                    frontierTwin.insert(neighSearch);
+                } else {
+                    frontier.insert(neighSearch);
+                }
             }
         }
     }
