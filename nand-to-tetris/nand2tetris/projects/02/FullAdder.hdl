@@ -14,4 +14,12 @@ CHIP FullAdder {
 
     PARTS:
     // Put you code here:
+    HalfAdder(a=a , b=b , sum=sumAB , carry=carryAB );
+    HalfAdder(a=c , b=sumAB , sum=sum , carry=carryABC );
+    Xor(a=carryABC , b=carryAB , out=carry );
+    /**
+     * 证明过程：
+     * 本质：sum+sum，carry+carry
+     * 最后一个应该是HalfAdder,但是HalfAdder有两个输出，这里只需要一个，而HalfAdder本身就是Xor和And的组合，所以取Xor
+     */
 }
