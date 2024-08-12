@@ -15,4 +15,21 @@ CHIP Bit {
 
     PARTS:
     // Put your code here:
+
+    // v0
+    // Mux(a=in , b=out , sel=load , out=out );
+
+    // v1
+    // DFF(in=in , out=delay_in );
+    // Mux(a=in , b=delay_in , sel=load , out=out );
+
+    // v2
+    // Mux(a=in , b=dffOut , sel=load , out=actualIn );
+    // DFF(in=actualIn , out=out, out=dffOut );
+
+    // v3
+    // 1. 对于combinational chips，多个part的顺序是没有关系的，因为他们是“同时的”，“并行的”
+    // 2. 可以有两个输入
+    Mux(a=dffOut , b=in , sel=load , out=actualIn );
+    DFF(in=actualIn , out=out, out=dffOut );
 }
