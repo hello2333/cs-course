@@ -1,56 +1,3 @@
-// This file is part of www.nand2tetris.org
-// and the book "The Elements of Computing Systems"
-// by Nisan and Schocken, MIT Press.
-// File name: projects/04/Fill.asm
-
-// Runs an infinite loop that listens to the keyboard input.
-// When a key is pressed (any key), the program blackens the screen,
-// i.e. writes "black" in every pixel;
-// the screen should remain fully black as long as the key is pressed. 
-// When no key is pressed, the program clears the screen, i.e. writes
-// "white" in every pixel;
-// the screen should remain fully clear as long as no key is pressed.
-
-// Put your code here.
-
-//  // init
-//  row = 0
-//  col = 0
-//  max_row = 256
-//  max_col = 32
-
-//  // key press
-//  color = black or white
-
-//  // update screen
-//  RAM[SCREEN + row * max_col + col] = color
-
-//  // update iterate
-//  col = col + 1
-//  if col >= max_col:
-//    col = 0
-//    row = row + 1
-//  if row >= max_row:
-//    row = 0
-
-
-//  // SCREEN + row * max_col + col
-//  // row * max_col
-//  (PRODUCT_LOOP)
-//  a = row
-//  b = max_col
-//  if b <= 0:
-//    go to PRODUCT_END
-//  a = a + row
-//  b = b - 1
-//  go to PRODUCT_LOOP
-//  (PRODUCT_END)
-
-//  index = a
-//  index = index + base
-//  index = index + col
-
-// /* init */
 @row
 M=0
 @col
@@ -63,8 +10,6 @@ M=D
 D=A
 @max_col
 M=D
-
-// /* key press */
 (LISTEN_KEY)
 @color
 M=0
@@ -74,28 +19,21 @@ D=M
 D;JGT
 @KEY_UP
 0;JMP
-
 (KEY_DOWN)
 @color
-M=1
+M=-1
 @UPDATE_SCREEN
 0;JMP
-
 (KEY_UP)
 @color
 M=0
 @UPDATE_SCREEN
 0;JMP
-
 (UPDATE_SCREEN)
-// /* update scree */
-// . R2 = row * max_col
-// · R0 = row
 @row
 D=M
 @R0
 M=D
-// · R1 = max_col
 @max_col
 D=M
 @R1
@@ -103,46 +41,37 @@ M=D
 @product
 M=0
 (PRODUCT_LOOP)
-// · if R1 <= 0: go to end
 @R1
 D=M
 @PRODUCT_END
 D;JLE
-// · R2 = R2 + R0
 @R0
 D=M
-@product  
-// 统一设计风格：计算结果都用变量保存，而不是用Rx保存
+@product
 M=M+D
-// · R1 = R1 - 1
 @R1
 M=M-1
 @PRODUCT_LOOP
 0;JMP
 (PRODUCT_END)
-
-// · index = SCREEN + R2 + col
 @SCREEN
-D=M
+D=A
 @index
 M=0
 M=M+D
 @product
-D=M // D=M 这一步很关键。要把加数用D临时保存起来，然后M=M+D中更新被加数的值
+D=M
 @index
 M=M+D
 @col
 D=M
 @index
-M=M+D // 计算结果用变量index保存起来
+M=M+D
 @color
 D=M
 @index
 A=M
 M=D
-
-// /* update iterate */
-// . col = col + 1
 @col
 M=M+1
 D=M
@@ -157,9 +86,6 @@ D=M
 D;JGE
 @LISTEN_KEY
 0;JMP
-
-// . if col >= max_col: col = 0 row = row + 1
-// . if row >= max_row: row = 0
 (ITERATE_COL)
 @col
 M=0
@@ -177,7 +103,6 @@ D=M
 D;JGE
 @LISTEN_KEY
 0;JMP
-
 (ITERATE_ROW)
 @row
 M=0
