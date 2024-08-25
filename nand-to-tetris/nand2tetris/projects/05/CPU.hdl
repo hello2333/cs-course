@@ -40,4 +40,92 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+    //// check the type of instruction
+    Not(in=instruction[15] , out=isAStruction );
+    And(a=instruction[15] , b=true , out=isCStruction );
+
+    //// set ARegister
+    // choose input for A
+    // if A-instruction, choose instruction as input
+    // if C-instruction, chose ALU out as input by control bit instruction[5]
+    Mux16(a=instruction, b=outALU, 
+        sel=isCStruction, out=registerAInput);
+    // error 2: ARegister load doesn't effect both for A-instruction and C-instruction
+    // calculate loadA for C struction
+    // if A-instruction, load is true
+    // if C-instruction, load is control bit instruction[5]
+    And(a=isCStruction , b=instruction[5] , 
+        out=loadAForCStruction );
+    // calcuate loadA for both
+    Or(a=loadAForCStruction , b=isAStruction , 
+        out=loadA );
+    // calculate A
+    ARegister(in=registerAInput, load=loadA, 
+        out=registerAOut, 
+        out[0..14]=addressM);
+
+    //// set DRegister, alse set inputX for ALU
+    // calculate load for D
+    // if A-instruction, load is zero
+    // if C-instruction, load is control bit instruction[4]
+    And(a=instruction[4] , b=isCStruction , out=loadD );
+    // calculate D
+    DRegister(in=outALU, load=loadD, 
+        out=inputX);
+    
+    //// set inputY for ALU
+    // error 1: miss this Mux16 chip the first time
+    // if A-instruction, choose registerAOut, sel should be zero
+    // if C-instruction, chose by control bit instruction[12]
+    And(a=isCStruction, b=instruction[12], out=selAM);
+    Mux16(a=registerAOut , b=inM , 
+        sel=selAM , out=inputY );
+    
+    //// ALU calculate
+    // if A-instruction, control bit should be fixed value to output inputY as result
+    // if C-instruction, control bit should come from instruction
+    Mux(a=true, b=instruction[11], sel=isCStruction, out=zxAlu);
+    Mux(a=true, b=instruction[10], sel=isCStruction, out=nxAlu);
+    Mux(a=false, b=instruction[9], sel=isCStruction, out=zyAlu);
+    Mux(a=false, b=instruction[8], sel=isCStruction, out=nyAlu);
+    Mux(a=false, b=instruction[7], sel=isCStruction, out=fAlu);
+    Mux(a=false, b=instruction[6], sel=isCStruction, out=noAlu);
+    ALU(x=inputX , y=inputY , 
+        zx=zxAlu , nx=nxAlu , 
+        zy=zyAlu , ny=nyAlu , 
+        f=fAlu , no=noAlu , 
+        out=outM, out=outALU , 
+        zr=zrOut , ng=ngOut );
+
+    //// writeM calculate
+    // if A-instruction, writeM is zero
+    // if C-instruction, writeM is control bit instruction[3]
+    And(a=instruction[3], b=isCStruction, 
+        out=writeM);
+
+    //// set PC
+    // calculate load for pc
+    // if A-instruction, load is zero
+    // if C-instruction, load should be calculate
+    Not(in=zrOut, out=NotZr);
+    Not(in=ngOut, out=NotNg);
+    And(a=NotZr, b=NotNg, out=JGT);
+    And(a=zrOut, b=true, out=JEQ);
+    And(a=true, b=NotNg, out=JGE);
+    And(a=NotZr, b=ngOut, out=JLT);
+    And(a=NotZr, b=true, out=JNE);
+    And(a=true, b=ngOut, out=JLE);
+    Mux8Way16(
+     a[0]=false, a[1..15]=false,
+     b[0]=JGT, b[1..15]=false, 
+     c[0]=JEQ, c[1..15]=false, 
+     d[0]=JGE, d[1..15]=false, 
+     e[0]=JLT, e[1..15]=false, 
+     f[0]=JNE, f[1..15]=false, 
+     g[0]=JLE, g[1..15]=false, 
+     h[0]=true, h[1..15]=false, 
+     sel=instruction[0..2], out[0]=pcLoadForCStruction);
+    Mux(a=false, b=pcLoadForCStruction, sel=isCStruction, out=pcLoad);
+    PC(in=registerAOut, load=pcLoad, 
+        inc=true, reset=reset, out[0..14]=pc);
 }

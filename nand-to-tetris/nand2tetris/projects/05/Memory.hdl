@@ -23,9 +23,40 @@
  */
 
 CHIP Memory {
-    IN in[16], load, address[15];
+    IN in[16], load, addressM[15];
     OUT out[16];
 
     PARTS:
     // Put your code here:
+    // V1
+    // RAM16K(in=in , load=load , address=address[0..13], out=RAM16K_OUT );
+    // RAM4K(in=in , load=load , address=address[0..11] , out=RAM4K_OUT1 );
+    // RAM4K(in=in , load=load , address=address[0..11] , out=RAM4K_OUT2 );
+    // Mux16(a=RAM4K_OUT1 , b=RAM4K_OUT2 , sel=address[12] , out=SCREEN_OUT );
+    // Register(in=in , load=load , out=KEY_OUT );
+    // Mux16(a=SCREEN_OUT , b=KEY_OUT , sel=address[13], out=DEVICE_OUT );
+    // Mux16(a=RAM16K_OUT , b=DEVICE_OUT , sel=address[14] , out=out );  
+
+    // V2
+    // DMux(in=load , sel=addressM[14] , a=load_ram , b=load_device );
+    // DMux(in=load_device , sel=addressM[13] , a=load_screen , b=load_key );
+    // DMux(in=load_screen , sel=addressM[12] , a=load_screen_part1 , b=load_screen_part2 );
+    // RAM16K(in=in , load=load_ram , address=addressM[0..13] , out=out_ram );
+    // RAM4K(in=in , load=load_screen_part1 , address=addressM[0..11] , out=out_screen_part1 );
+    // RAM4K(in=in , load=load_screen_part2 , address=addressM[0..11] , out=out_screen_part2 );
+    // Register(in=in , load=load_key , out=out_key );
+    // Mux16(a=out_screen_part1 , b=out_screen_part2 , sel=addressM[12] , out=out_screen );
+    // Mux16(a=out_screen , b=out_key , sel=addressM[13] , out=out_device );
+    // Mux16(a=out_ram , b=out_device , sel=addressM[14] , out=out );
+
+    // V3
+    DMux(in=load , sel=address[14] , a=load_ram , b=load_device );
+    DMux(in=load_device , sel=address[13] , a=load_screen , b=load_key );
+    
+    RAM16K(in=in , load=load_ram , address=address[0..13] , out=out_ram );
+    Screen(in=in , load=load_screen , address=address[0..12] , out=out_screen );
+    Keyboard(out=out_key );
+
+    Mux16(a=out_screen , b=out_key , sel=address[13] , out=out_device );
+    Mux16(a=out_ram , b=out_device , sel=address[14] , out=out );
 }
