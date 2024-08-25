@@ -84,16 +84,16 @@ CHIP CPU {
     //// ALU calculate
     // if A-instruction, control bit should be fixed value to output inputY as result
     // if C-instruction, control bit should come from instruction
-    Mux(a=true, b=instruction[11], sel=isCStruction, out=zxAlu);
-    Mux(a=true, b=instruction[10], sel=isCStruction, out=nxAlu);
-    Mux(a=false, b=instruction[9], sel=isCStruction, out=zyAlu);
-    Mux(a=false, b=instruction[8], sel=isCStruction, out=nyAlu);
-    Mux(a=false, b=instruction[7], sel=isCStruction, out=fAlu);
-    Mux(a=false, b=instruction[6], sel=isCStruction, out=noAlu);
+    // Mux(a=true, b=instruction[11], sel=true, out=zxAlu);
+    // Mux(a=false, b=instruction[10], sel=true, out=nxAlu);
+    // Mux(a=true, b=instruction[9], sel=true, out=zyAlu);
+    // Mux(a=false, b=instruction[8], sel=true, out=nyAlu);
+    // Mux(a=true, b=instruction[7], sel=true, out=fAlu);
+    // Mux(a=false, b=instruction[6], sel=true, out=noAlu);
     ALU(x=inputX , y=inputY , 
-        zx=zxAlu , nx=nxAlu , 
-        zy=zyAlu , ny=nyAlu , 
-        f=fAlu , no=noAlu , 
+        zx=instruction[11] , nx=instruction[10] , 
+        zy=instruction[9] , ny=instruction[8] , 
+        f=instruction[7] , no=instruction[6] , 
         out=outM, out=outALU , 
         zr=zrOut , ng=ngOut );
 
@@ -111,10 +111,10 @@ CHIP CPU {
     Not(in=ngOut, out=NotNg);
     And(a=NotZr, b=NotNg, out=JGT);
     And(a=zrOut, b=true, out=JEQ);
-    And(a=true, b=NotNg, out=JGE);
+    Or(a=zrOut, b=NotNg, out=JGE);
     And(a=NotZr, b=ngOut, out=JLT);
     And(a=NotZr, b=true, out=JNE);
-    And(a=true, b=ngOut, out=JLE);
+    Or(a=zrOut, b=ngOut, out=JLE);
     Mux8Way16(
      a[0]=false, a[1..15]=false,
      b[0]=JGT, b[1..15]=false, 
