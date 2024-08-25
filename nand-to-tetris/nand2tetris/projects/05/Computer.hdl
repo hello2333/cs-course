@@ -20,4 +20,30 @@ CHIP Computer {
 
     PARTS:
     // Put your code here:
+    // V1
+    // Memory(in=outM, load=writeM, address=address, out=inputM);
+    // Memory(in=pc, load=false, address=address, out=instruction);
+    // CPU(inM=inputM, instruction=instruction, reset=reset,
+    //     outM=outM, writeM=writeM, addressM=address, pc=pc);
+
+    // V2
+    // RAM16K(in=outM , load=writeM , address=addressRAM , out=inputM );
+    // ROM32K(address=pc , out=instruction );
+    // Screen(in=outM , load=writeM , 
+    //   address=addressScreen , 
+    //   out=screenOUt );
+    // CPU(inM=inputM, instruction=instruction, reset=reset,
+    //     outM=outM, writeM=writeM, 
+    //     addressM=originAddress, 
+    //     addressM[0..13]=addressRAM, 
+    //     addressM[0..12]=addressScreen, 
+    //     pc=pc);
+
+    // V3
+    ROM32K(address=pc , out=instruction );
+    Memory(in=outM, load=writeM, address=originAddress, out=inputM);
+    CPU(inM=inputM, instruction=instruction, reset=reset,
+        outM=outM, writeM=writeM, 
+        addressM=originAddress, 
+        pc=pc);
 }
