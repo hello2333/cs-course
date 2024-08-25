@@ -1,4 +1,5 @@
 from enum import Enum
+import sys
 
 class InstrutionType(Enum):
   A_INSTRUCTION = 1
@@ -20,7 +21,7 @@ class Parser(object):
   
   def advance(self):
     # do nothing in python
-    while len(self.instruction.strip()) == 0 and self.has_more_lines():
+    while (len(self.instruction.strip()) == 0 or self.instruction.startswith("//")) and self.has_more_lines():
       continue
     if len(self.instruction) == 0:
       return
@@ -59,19 +60,21 @@ class Parser(object):
     #   return result[0] as dest
     # else
     #   return empty and print error log
-    return self.dest
+    return self.dest_str
   
   def comp(self):
-    return self.comp
+    return self.comp_str
   
   def jump(self):
-    return self.jump
+    return self.jump_str
   
   def _parse_instruction(self):
+    self.instruction = self.instruction.strip()
     self.ins_type = self.instruct_type()
-    self.dest = ""
-    self.comp = ""
-    self.jump = ""
+    self.dest_str = ""
+    self.comp_str = ""
+    self.jump_str = ""
+    # print("====== read construction: ", self.instruction, ", type: ", self.ins_type)
 
     if not self.is_c_instruction():
       return
@@ -81,31 +84,31 @@ class Parser(object):
       return ""
     
     # parse comp part
-    comp_part = ins_part[0].split(":")
+    comp_part = ins_part[0].split("=")
     if len(comp_part) == 0:
       return ""
     
     if len(comp_part) == 2:
-      self.dest = comp_part[0]
-      self.comp = comp_part[1]
+      self.dest_str = comp_part[0]
+      self.comp_str = comp_part[1]
     elif len(comp_part) == 1:
-      self.comp = comp_part[0]
+      self.comp_str = comp_part[0]
     
     # parse jump part
     if len(ins_part) == 1:
       return
     jump_part = ins_part[1]
-    self.jump = jump_part
+    self.jump_str = jump_part
     return
   
   def is_c_instruction(self):
-    self.ins_type == InstrutionType.C_INSTRUCTION
+    return self.ins_type == InstrutionType.C_INSTRUCTION
   
   def is_a_instruction(self):
-    self.ins_type == InstrutionType.A_INSTRUCTION
+    return self.ins_type == InstrutionType.A_INSTRUCTION
 
   def is_l_instruction(self):
-    self.ins_type == InstrutionType.L_INSTRUCTION
+    return self.ins_type == InstrutionType.L_INSTRUCTION
 
 # Code generator module
 class Code(object):
@@ -148,12 +151,12 @@ class Code(object):
                  "JNE": "101", "JLE": "110", "JMP": "111"}
     if asm_jump in jump_dict.keys():
       return jump_dict[asm_jump]
-    print("======= invalid asm_jump: ", asm_jump)
+    # print("======= invalid asm_jump: ", asm_jump)
     return "000"
   
   def symbol(self, asm_symbol):
-    bin_symbol = bin(asm_symbol)
-    bin_symbol.zfill(16)
+    bin_symbol = bin(int(asm_symbol))
+    bin_symbol = bin_symbol[2:].zfill(16)
     return bin_symbol
 
   def _append_dest_bin(self, target, asm_dest, bin_dest):
@@ -174,21 +177,34 @@ class Code(object):
 #  if instruction is A-instruction, convert it to binary code
 #  if instruction is C-instruction, convert it to binary code
 #  write the binary code to *.hack file
-with open("/Users/namiyazhang/workspace/cs-course/nand-to-tetris/nand2tetris/projects/06/max/MaxL.asm", 'r') as f:
-  asm_parser = Parser(f)
-  while asm_parser.has_more_lines():
-    asm_parser.advance()
+if len(sys.argv) != 2:
+  print("Usuage: python assembler.py file_absolute_name")
+  exit(0)
 
-    bin_code = ""
-    asm_coder = Code()
-    if asm_parser.is_c_instruction():
-      bin_code = "100"
-      bin_code += asm_coder.dest(asm_parser.dest())
-      bin_code += asm_coder.comp(asm_parser.comp())
-      bin_code += asm_coder.jump(asm_parser.jump())
-    elif asm_parser.is_a_instruction():
-      bin_code = asm_coder.symbol(asm_parser.symbol())
-    print("====== asm: ", asm_parser.instruction, ", bin_code: ", bin_code)
+read_file_name = sys.argv[1]
+write_file_name = read_file_name.replace("asm", "hack")
+print(read_file_name, write_file_name)
+
+with open(write_file_name, 'w') as write_f:
+  with open(read_file_name, 'r') as f:
+    asm_parser = Parser(f)
+    while asm_parser.has_more_lines():
+      asm_parser.advance()
+
+      bin_code = ""
+      asm_coder = Code()
+      if asm_parser.is_c_instruction():
+        bin_code = "111"
+        bin_code += asm_coder.comp(asm_parser.comp())
+        bin_code += asm_coder.dest(asm_parser.dest())
+        bin_code += asm_coder.jump(asm_parser.jump())
+      elif asm_parser.is_a_instruction():
+        bin_code = asm_coder.symbol(asm_parser.symbol())
+      # print("====== asm: ", asm_parser.instruction, ", bin_code: ", bin_code, 
+      #       "dest=", asm_parser.dest(), asm_coder.dest(asm_parser.dest()),
+      #       "comp=", asm_parser.comp(), asm_coder.comp(asm_parser.comp()),
+      #       "jump=", asm_parser.jump(), asm_coder.jump(asm_parser.jump()))
+      write_f.write(bin_code + "\n")
 
 print("hello world")
 
