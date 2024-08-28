@@ -11,7 +11,6 @@ class Parser(object):
   def __init__(self, f):
     self.instruction = ""
     self.ins_type = InstrutionType.A_INSTRUCTION
-    # with open(asm_file, 'r') as self.f:
     self.f = f
     return
 
@@ -177,6 +176,28 @@ class Code(object):
 #  if instruction is A-instruction, convert it to binary code
 #  if instruction is C-instruction, convert it to binary code
 #  write the binary code to *.hack file
+
+# Convert A-instruction(without symbols)
+# instruction format: @xxx, xxx is decimal value
+# input: instruction text
+# output: binary code string
+# algorithm/process: 
+#   get symbol: method1 split the instruction by @; method2 get the sub string[1:] as xxx
+#   convert symbol to binary code: convert decimal xxx to binary 
+
+# Convert C-instruction(without symbols)
+# assembly instruction format: dest=comp;jump
+# binary format: 1xxaccccccdddjjj
+# input: instruction text
+# output: binary code string
+# algorithm/process:
+#   get dest and convert dest to binary
+#   get comp and convert comp to binary
+#   get jump adn convert jump to binary
+#   // split instruction by ";": 
+#     // first part:dest=comp
+#     // secodn part: jump
+
 if len(sys.argv) != 2:
   print("Usuage: python assembler.py file_absolute_name")
   exit(0)
@@ -207,24 +228,3 @@ with open(write_file_name, 'w') as write_f:
       write_f.write(bin_code + "\n")
 
 print("hello world")
-
-# Convert A-instruction(without symbols)
-# instruction format: @xxx, xxx is decimal value
-# input: instruction text
-# output: binary code string
-# algorithm/process: 
-#   get symbol: method1 split the instruction by @; method2 get the sub string[1:] as xxx
-#   convert symbol to binary code: convert decimal xxx to binary 
-
-# Convert C-instruction(without symbols)
-# assembly instruction format: dest=comp;jump
-# binary format: 1xxaccccccdddjjj
-# input: instruction text
-# output: binary code string
-# algorithm/process:
-#   get dest and convert dest to binary
-#   get comp and convert comp to binary
-#   get jump adn convert jump to binary
-#   // split instruction by ";": 
-#     // first part:dest=comp
-#     // secodn part: jump
