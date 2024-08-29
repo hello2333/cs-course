@@ -12,6 +12,7 @@ class Parser(object):
     self.instruction = ""
     self.ins_type = InstrutionType.A_INSTRUCTION
     self.f = f
+    self.ins_index = 0
     return
 
   def has_more_lines(self):
@@ -26,6 +27,12 @@ class Parser(object):
       return
     self._parse_instruction()
     return
+
+  def forward(self):
+    self.ins_index += 1
+  
+  def address(self):
+    return self.ins_index
 
   def instruct_type(self):
     # if instruction start with @: A_INSTRUCTION
@@ -74,6 +81,10 @@ class Parser(object):
     self.comp_str = ""
     self.jump_str = ""
     # print("====== read construction: ", self.instruction, ", type: ", self.ins_type)
+
+    instruction_comment_split = self.instruction.split("//")
+    if len(instruction_comment_split) > 0:
+      self.instruction = instruction_comment_split[0].strip()
 
     if not self.is_c_instruction():
       return
@@ -166,16 +177,58 @@ class Code(object):
     return bin_dest
 
 # Symbol table module
+class SymbolTable:
+  def __init__(self) -> None:
+    self.entrys = {"SP": 0, "LCL": 1, "ARG": 2, "THIS": 3, "THAT": 4,
+                   "R0" : 0, "R1" : 1, "R2" : 2, "R3" : 3, "R4" : 4, 
+                   "R5" : 5, "R6" : 6, "R7" : 7, "R8" : 8, "R9" : 9, 
+                   "R10" : 10, "R11" : 11, "R12" : 12, "R13" : 13, "R14" : 14, "R15" : 15,
+                   "SCREEN": 16384, "KBD": 24576}
+    self.ram_address = 16
+    pass
+
+  def forward(self):
+    self.ram_address += 1
+  
+  def get_ram_address(self):
+    return self.ram_address
+
+  def add_entry(self, symbol, address):
+    self.entrys[symbol] = address
+    print("======= add_entry symbol:", symbol, "address:", address)
+
+  def contains(self, symbol):
+    return symbol in self.entrys.keys()
+
+  def get_address(self, symbol):
+    if self.contains(symbol):
+      return self.entrys[symbol]
+    return -1
 
 # peseoucode
 # target: convert assembly code to binary code
+
+# Pass1: Gen Symbol Table
+# open the input file
+# while has more lines:
+#   get next instruction
+#   if instruction is L-instruction, add entry(symbol, ins_index) in symbol table
+#   forward_index
 
 # open the input file
 # while has more lines:
 #  get next instruction
 #  if instruction is A-instruction, convert it to binary code
 #  if instruction is C-instruction, convert it to binary code
+#  if instruction is L-instruction, convert symbol to decimal, then convert it to binary code
 #  write the binary code to *.hack file
+
+# convert symbol to decimal
+# if symbol table contains symbol, return decimal
+# else 
+#   forward ram_symbol_pointer
+#   add (symbol, ram_sybol_pointer) in entry
+#   return ram_symbol_pointer
 
 # Convert A-instruction(without symbols)
 # instruction format: @xxx, xxx is decimal value
@@ -206,6 +259,17 @@ read_file_name = sys.argv[1]
 write_file_name = read_file_name.replace("asm", "hack")
 print(read_file_name, write_file_name)
 
+
+symbol_table = SymbolTable()
+with open(read_file_name, 'r') as read_f:
+  asm_parser = Parser(read_f)
+  while asm_parser.has_more_lines():
+    asm_parser.advance()
+    if asm_parser.is_l_instruction():
+      symbol_table.add_entry(asm_parser.symbol(), asm_parser.address())
+    else:
+      asm_parser.forward()
+
 with open(write_file_name, 'w') as write_f:
   with open(read_file_name, 'r') as f:
     asm_parser = Parser(f)
@@ -220,11 +284,23 @@ with open(write_file_name, 'w') as write_f:
         bin_code += asm_coder.dest(asm_parser.dest())
         bin_code += asm_coder.jump(asm_parser.jump())
       elif asm_parser.is_a_instruction():
-        bin_code = asm_coder.symbol(asm_parser.symbol())
-      # print("====== asm: ", asm_parser.instruction, ", bin_code: ", bin_code, 
-      #       "dest=", asm_parser.dest(), asm_coder.dest(asm_parser.dest()),
-      #       "comp=", asm_parser.comp(), asm_coder.comp(asm_parser.comp()),
-      #       "jump=", asm_parser.jump(), asm_coder.jump(asm_parser.jump()))
+        symbol_start = asm_parser.symbol()[0]
+        # error : the method to check if symbol is a number is wrong
+        # error : not replace alpha symbol with decimal for a_instruction
+        if symbol_start >= '0' and symbol_start <= '9':
+          bin_code = asm_coder.symbol(asm_parser.symbol())
+        else:
+          if not symbol_table.contains(asm_parser.symbol()):
+            symbol_table.add_entry(asm_parser.symbol(), symbol_table.get_ram_address())
+            symbol_table.forward()
+          bin_code = asm_coder.symbol(symbol_table.get_address(asm_parser.symbol()))
+      # error 1: not skip write for l_instruction
+      elif asm_parser.is_l_instruction():
+        continue
+      print("====== asm: ", asm_parser.instruction, ", bin_code: ", bin_code, 
+            "dest=", asm_parser.dest(), asm_coder.dest(asm_parser.dest()),
+            "comp=", asm_parser.comp(), asm_coder.comp(asm_parser.comp()),
+            "jump=", asm_parser.jump(), asm_coder.jump(asm_parser.jump()))
       write_f.write(bin_code + "\n")
 
 print("hello world")
