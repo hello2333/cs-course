@@ -1,0 +1,14 @@
+{
+  "files.associations": {
+    "stdio.h": "c",
+    "limits.h": "c",
+    "__hash_table": "c",
+    "cstring": "c",
+    "locale": "c",
+    "string": "c",
+    "vector": "c",
+    "__bit_reference": "c",
+    "__string": "c"
+  },
+  "cmake.configureOnOpen": true
+}

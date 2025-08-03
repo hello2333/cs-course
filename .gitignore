@@ -4,8 +4,16 @@
 # Log file
 *.log
 
+# test file
+*.txt
+
 # BlueJ files
 *.ctxt
+
+# idea
+*.iml
+*.png
+**/.lift/*
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
@@ -21,7 +29,16 @@
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+# ok
+*.ok_history
+*.ok_messages
+*.ok_storage
+*ok
+construct_check.py
+.DS_Store
 
+# test
+tests/
 # python
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -182,4 +199,4 @@ cython_debug/
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+.idea/

@@ -14,11 +14,13 @@ def sums(n, k):
     >>> sums(5, 3)
     [[3, 1, 1], [2, 2, 1], [1, 3, 1], [2, 1, 2], [1, 2, 2], [1, 1, 3]]
     """
-    if ______:
-        return ______
+    if n < k or k == 0 or n == 0:
+        return []
+    if n == k and n == 1:
+        return [n]
     y = []
-    for x in ______:
-        y.extend([______ for s in sums(______)])
+    for x in range(n - k + 2):
+        y.extend([[x] + s for s in sums(n - x, k - 1) if not s])
     return y
 
 # ORIGINAL SKELETON FOLLOWS

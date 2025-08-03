@@ -195,7 +195,7 @@ class SymbolTable:
 
   def add_entry(self, symbol, address):
     self.entrys[symbol] = address
-    print("======= add_entry symbol:", symbol, "address:", address)
+    # print("======= add_entry symbol:", symbol, "address:", address)
 
   def contains(self, symbol):
     return symbol in self.entrys.keys()
@@ -259,7 +259,6 @@ read_file_name = sys.argv[1]
 write_file_name = read_file_name.replace("asm", "hack")
 print(read_file_name, write_file_name)
 
-
 symbol_table = SymbolTable()
 with open(read_file_name, 'r') as read_f:
   asm_parser = Parser(read_f)
@@ -297,10 +296,10 @@ with open(write_file_name, 'w') as write_f:
       # error 1: not skip write for l_instruction
       elif asm_parser.is_l_instruction():
         continue
-      print("====== asm: ", asm_parser.instruction, ", bin_code: ", bin_code, 
-            "dest=", asm_parser.dest(), asm_coder.dest(asm_parser.dest()),
-            "comp=", asm_parser.comp(), asm_coder.comp(asm_parser.comp()),
-            "jump=", asm_parser.jump(), asm_coder.jump(asm_parser.jump()))
+      # print("====== asm: ", asm_parser.instruction, ", bin_code: ", bin_code, 
+      #       "dest=", asm_parser.dest(), asm_coder.dest(asm_parser.dest()),
+      #       "comp=", asm_parser.comp(), asm_coder.comp(asm_parser.comp()),
+      #       "jump=", asm_parser.jump(), asm_coder.jump(asm_parser.jump()))
       write_f.write(bin_code + "\n")
 
 print("hello world")
