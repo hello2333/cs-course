@@ -12,29 +12,12 @@ class CommandType(Enum):
   C_FUNCTION = 7
   C_RETURN = 8
   C_CALL = 9
+  C_COMMENT = 10
 
 class Parser:
-  def __init__(self, vm_f):
-    self.vm_f = vm_f
-    self._init_command()
-
-  def has_more_lines(self):
-    self._commnad = self.vm_f.readline()
-    return len(self._commnad) != 0
-  
-  def advance(self):
-    # while current line is empty and has_more_lines:
-    #   update currnet_line
-    # if current_line is not empty
-    #   parse current line
-    # else
-    #   exit
-    while not self._is_valid_line(self._commnad) and self.has_more_lines():
-      continue
-    if not self._is_valid_line(self._commnad):
-      return
-    self._init_command()
-    self._parse(self._commnad)
+  def __init__(self, line):
+    self._line = line
+    self._parse()
 
   def command_type(self):
     return self._command_type
@@ -50,14 +33,17 @@ class Parser:
     # TODO: 这里强转为整型是不对的
     return self._arg2
 
-  def is_arithmetic_command(self):
+  def origin_line(self):
+    return self._line
+  
+  def is_push_pop(self):
+    return self._command_type == CommandType.C_PUSH or self._command_type == CommandType.C_POP
+  
+  def is_arithmetic(self):
     return self._command_type == CommandType.C_ARITHMETIC
   
-  def is_push_pop_command(self):
-    return self._command_type == CommandType.C_POP or self._command_type == CommandType.C_PUSH
-
-  def command_type(self):
-    return self._command_type
+  def is_comment(self):
+    return self._command_type == CommandType.C_COMMENT
 
   def _is_arithmetic_command(self, command):
     arithmetic_command = {'add', 'sub', 'and', 'or', 'neg', 'not', 'eq', 'lt', 'gt'}
@@ -67,28 +53,37 @@ class Parser:
     push_pop_command = {'push', 'pop'}
     return command in push_pop_command
 
-  def _parse(self, line):
-    command_line = ''
+  def _parse(self):
+    # if line is comment or empty:
+    #   return
+    
+    # split line by space
+    # check the line: 
+    #   if not 3 parts or 1 one parts
+    #     raise exception
+    
+    # if push/pop:
+    #   update command_type by parts[0]
+    #   update arg1 by parts[1]
+    #   update arg2 by parts[2]
+    # elif arithmetic:
+    #   update command_type
+    #   update arg1 by parts[1]
+    # else
+    #   raise exception
+    self._init_command()
+    if self._is_skip_line():
+      return
   
-    line_parts = line.strip().split('//')
-    if len(line_parts) > 0:
-      command_line = line_parts[0]
-    command_parts = command_line.split(' ')
-    # rm command comment
-    # check command type
-    # if is_arithmetic_command:
-    #   parse arithemetic
-    # elif is_push_pop_command:
-    #   parse push_pop
-    # else:
-    #   not support
+    self._line = self._line.strip()
+    command_parts = self._line.split(' ')
     if len(command_parts) < 1:
       raise Exception(f'invalid command: {line}')
     command = command_parts[0]
     if self._is_arithmetic_command(command):
       self._parse_arithmetic(command_parts)
     elif self._is_push_pop_command(command):
-      self._parse_push_pop(command)
+      self._parse_push_pop(command_parts)
     else:
       raise Exception(f'not support command {command} now')
     pass
@@ -97,7 +92,7 @@ class Parser:
     # check
     # parse
     if len(command_parts) != 1:
-      raise Exception(f'Invalid arithmetic command {self._commnad}, parts len= {len(command_parts)}')
+      raise Exception(f'Invalid arithmetic command {self._line}, parts len={command_parts}')
     self._command_type = CommandType.C_ARITHMETIC
     self._arg1 = command_parts[0]
     self._arg2 = ''
@@ -105,7 +100,7 @@ class Parser:
 
   def _parse_push_pop(self, command_parts):
     if len(command_parts) != 3:
-      raise Exception(f'Invalid push_pop command {self._commnad}, parts len= {len(command_parts)}')
+      raise Exception(f'Invalid push_pop command {self._line}, parts len={command_parts}')
     if command_parts[0] == 'push':
       self._command_type = CommandType.C_PUSH
     else:
@@ -116,159 +111,242 @@ class Parser:
 
   def _init_command(self):
     self._commnad = ''
-    self._command_type = CommandType.C_INVALID
-    self._arg1 = ""
-    self._arg2 = 0
+    self._command_type = CommandType.C_COMMENT
+    self._arg1 = ''
+    self._arg2 = ''
   
-  def _is_valid_line(self, line):
-    return (not self._is_empty_line(line)) and (not self._is_comment_line(line))
+  def _is_skip_line(self):
+    return self._is_empty_line() or self._is_comment_line()
 
-  def _is_empty_line(self, line):
-    return len(line.strip()) == 0
+  def _is_empty_line(self):
+    return len(self._line.strip()) == 0
   
-  def _is_comment_line(self, line):
-    return line.startswith("//")
+  def _is_comment_line(self):
+    return self._line.startswith("//")
 
 class CodeWriter:
-  def __init__(self, out_file):
-    self.out_file = out_file
+  def __init__(self):
     pass
 
-  def write_arithmetic(self, command):
+  def write_arithmetic(self, origin_line, operator):
+    asm = self._write_comment(origin_line)
+
     two_operand_command = {'add', 'sub', 'and', 'or'}
     one_operand_command = {'neg', 'not'}
     compare_command = {'eq', 'lt', 'gt'}
-    if command in two_operand_command:
-      self._write_two_operand_arithmetic(command)
-    elif command in one_operand_command:
-      self._write_one_operand_arithmetic(command)
-    elif command in compare_command:
-      self._write_compare_arithmetic(command)
+    if operator in two_operand_command:
+      asm += self._write_two_operand_arithmetic(operator)
+    elif operator in one_operand_command:
+      asm += self._write_one_operand_arithmetic(operator)
+    elif operator in compare_command:
+      asm += self._write_compare_arithmetic(operator)
     else:
-      raise Exception(f'invalid arithmetic: {command}')
-    pass
+      raise Exception(f'invalid arithmetic: {operator}')
+    return asm
 
-  def write_push_pop(self, command_type, segment, index):
-    dynamic_segment = {'LCL', 'ARG', 'TEMP', 'THIS', 'THAT', 'STATIC'}
-    point_segment = {'POINT'}
-    constant_segment = {"CONSTANT"}
+  def write_push_pop(self, origin_line, command_type, segment, index):
+    asm = self._write_comment(origin_line)
+
+    dynamic_segment = {'local', 'argument', 'temp', 'this', 'that', 'static'}
+    point_segment = {'point'}
+    constant_segment = {"constant"}
     if command_type == CommandType.C_PUSH:
       if segment in dynamic_segment:
-        self._push_segment_index(segment, index)
+        asm += self._push_segment_index(segment, index)
       elif segment in point_segment:
-        self._push_point_index(index)
+        asm += self._push_point_index(index)
       elif segment in constant_segment:
-        self._push_constant_value(index)
+        asm += self._push_constant_value(index)
       else:
         raise Exception(f'invalid push segment: {segment}')
     elif command_type == CommandType.C_POP:
       if segment in dynamic_segment:
-        self._pop_segment_index(segment, index)
+        asm += self._pop_segment_index(segment, index)
       elif segment in point_segment:
-        self._pop_point_index(index)
+        asm += self._pop_point_index(index)
       else:
         raise Exception(f'invalid pop segment: {segment}')
     else:
         raise Exception(f'invalid push_pop command_type: {command_type}')
-    pass
+    return asm
   
-  def close(self):
-    pass
+  def _write_comment(self, origin_line):
+    comment_line = f"\n // ### {origin_line}\n"
+    return comment_line
 
-  def _pop_stack(self, target_register):
-    # target_register = RAM[--SP]
-    pass
-  
-  def _push_stack(self):
-    # RAM[SP++]=D
-    pass
+  def _convert_to_op_type(self, operator):
+    operator_2_optype_map = {"add": "+", "sub": "-", "neg": "-",
+                             "and": "&", "or": "|", "not": "!",
+                             "eq": "JEQ", "gt": "JGT", "lt": "JLT"}
+    if operator_2_optype_map.get(operator):
+      return operator_2_optype_map[operator]
+    raise Exception(f'not find op_type. invalid operator {operator}')
   
   def _write_two_operand_arithmetic(self, operator):
-    # _pop_stack(R10)
-    # _pop_stack(R11)
-    # _two_operand_calculate(R10, R11, operator)
-    #   R10 = R10 operator R11
-    #   D=M
-    # _push_stack()
-    pass
+    op_type = self._convert_to_op_type(operator)
+    asm = ''
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'D=M\n'
+
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += f'M=D{op_type}M\n'
+
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'M=M+1\n'
+    return asm
 
   def _write_one_operand_arithmetic(self, operator):
-    # _pop_stack(R10)
-    # _one_operand_calcuate
-    #   D=operator M
-    # _push_stack()
-    pass
+    op_type = self._convert_to_op_type(operator)
+    asm = ''
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+    asm += 'A=M\n'
+    asm += f'M={op_type}M\n'
 
-  def _write_compare_arithmetic(self, command):
-    # _pop_stack(R10)
-    # _pop_stack(R11)
-    # R10 = R10 - R11
-    # D=M
-    # D;jump_type
-    # (NOT_MATCHED)
-    # D=0
-    # _push_stack()
-    # @END
-    # 0;JMP
-    # (MATCHED)
-    # D=1
-    # _push_stack()
-    # (END)
-    # @END
-    # 0;JMP
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'M=M+1\n'
+    return asm
 
-    # _pop_stack(R10)
-    # _pop_stack(R11)
-    # _two_operand_calculate(R10, R11)
-    # _jump_by_result(jump_type)
-    # _compare_mismatched()
-    # _compare_matched()
-    pass
+  def _write_compare_arithmetic(self, operator):
+    op_type = self._convert_to_op_type(operator)
+    asm = ''
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+    asm += 'A=M\n'
+    asm += 'D=M\n'
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+    asm += 'A=M\n'
+    asm += 'M=D-M\n'
+    asm += 'D=M\n'
 
-  def _two_operand_calculate(self, op1, op2, operator):
-    # op1 = op1 operator op2
-    # D = op1
-    pass
+    asm += '\n'
+    asm += '@MATCH\n'
+    asm += f'D;{op_type}\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'M=0\n'
+    asm += '@UPDATE_SP\n'
+    asm += '0;JMP\n'
 
-  def _one_operand_calcuate(slef, op, operator):
-    # D = operator op
-    pass
+    asm += '\n'
+    asm += '(MATCH)\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'M=-1\n'
 
-  def _compare_matched():
-    # RAM[SP++] = 1
-    pass
-
-  def _compare_mismatched():
-    # RAM[SP++] = 0
-    pass
+    asm += '\n'
+    asm += '(UPDATE_SP)\n'
+    asm += '@SP\n'
+    asm += 'M=M+1\n'
+    return asm
   
   def _push_segment_index(self, segment, index):
-    # _access_segment_i(segment, index)
-    # _push_stack()
-    pass
+    asm = ''
+    asm += '// read RAM[{segment} + {index}]\n'
+    asm += f'@{index}\n'
+    asm += 'D=A\n'
+    asm += f'@{segment}\n'
+    asm += 'A=D+M\n'
+    asm += 'D=M\n'
+    asm += '\n'
+
+    asm += '// write RAM[SP]\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'M=D\n'
+
+    asm += '\n'
+    asm += '// update SP\n'
+    asm += '@SP\n'
+    asm += 'M=M+1\n'
+    return asm
 
   def _pop_segment_index(self, segment, index):
-    # _pop_stack(R10)
-    # _update_segment_i(segment, index)
-    pass
+    asm = ''
+    asm += '// update SP\n'
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+    asm += '\n'
+    asm += '// compute {segment} + {index} \n'
+    asm += f'@{index}\n'
+    asm += 'D=A\n'
+    asm += f'@{segment}\n'
+    asm += 'A=D+M\n'
+    asm += 'D=A\n'
+    asm += '@R13\n'
+    asm += 'M=D\n'
+    asm += '\n'
+    asm += '// read RAM[SP]\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'D=M\n'
+    asm += '\n'
+    asm += '// write RAM[{segment} + {index}] \n'
+    asm += '@R13\n'
+    asm += 'A=M\n'
+    asm += 'M=D\n'
+    return asm
 
   def _push_point_index(self, index):
-    # _access_point_index(index)
-    # _push_stack()
-    pass
+    op_type = 'THIS'
+    if index == '1':
+      op_type = 'THAT'
+    asm = ''
+    asm += f'@{op_type}\n'
+    asm += 'A=M\n'
+    asm += 'D=M\n'
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'M=D\n'
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'M=M+1\n'
+    return asm
 
   def _pop_point_index(self, index):
-    # _pop_stack(R10)
-    # _update_point_index(index)
-    pass
+    op_type = 'THIS'
+    if index == '1':
+      op_type = 'THAT'
+    asm = ''
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'D=M\n'
+    asm += '\n'
+    asm += f'@{op_type}\n'
+    asm += 'A=M\n'
+    asm += 'M=D\n'
+    return asm
 
   def _push_constant_value(self, value):
-    # @value
-    # D=A
-    # _push_stack()
-    pass
+    asm = ''
+    asm += '@constant\n'
+    asm += 'D=A\n'
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'M=D\n'
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'M=M+1\n'
+    return asm
 
-# Process
+# Process 看了眼一年前写的伪代码，太细节了，分层做的不好。
+# 伪代码只做流程层面的事情，对抽象的函数进行调用。不应该有细节的的东西
 # while parser.has_more_lines():
 #   parse current lines
 #     split the line by space
@@ -301,30 +379,33 @@ class CodeWriter:
 #         push static/temp i: RAM[SP++]=RAM[16/5+i]
 #         pop  static/temp i: RAM[16/5+i]=RAM[--SP]
 
+# Process 2025.10.08
 # check param
 if len(sys.argv) != 2:
   print("Usuage: python vmtranslator.py file_absolute_name")
   exit(0)
 
-# parse source file name and generate target file name
 read_file_name = sys.argv[1]
 write_file_name = read_file_name.replace("vm", "asm")
 print(read_file_name, write_file_name)
 
-# open the file and handle file
 vm_lines = 0
-with open(write_file_name, 'w') as asm_f:
-  with open(read_file_name, 'r') as vm_f:
-    vm_parser = Parser(vm_f)
-    while vm_parser.has_more_lines():
-      vm_parser.advance()
-      vm_lines += 1
-      vm_coder = CodeWriter(asm_f)
-      if vm_parser.is_arithmetic_command():
-        vm_coder.write_arithmetic(vm_parser.arg1())
-      elif vm_parser.is_push_pop_command():
-        vm_coder.write_push_pop(vm_parser.command_type(), vm_parser.arg1(), vm_parser.arg2())
+with open(write_file_name, 'w', encoding='utf-8') as write_f:
+  with open(read_file_name, 'r', encoding='utf-8') as read_f:
+    for line in read_f:
+      # initiate parser for current line
+      parser = Parser(line)
+      writer = CodeWriter()
+      asm = ''
+      if parser.is_comment():
+        continue
+      elif parser.is_push_pop():
+        asm = writer.write_push_pop(parser.origin_line(), parser.command_type(), parser.arg1(), parser.arg2())
+      elif parser.is_arithmetic():
+        asm = writer.write_arithmetic(parser.origin_line(), parser.arg1())
       else:
-        raise Exception(f'Not support command {vm_parser.arg1} now')
+        raise Exception(f'Not support command {parser.origin_line()}, command_type={parser.command_type()} now')
+      vm_lines += 1
+      write_f.write(asm)
 
 print(f'success. handle lines {vm_lines}')
