@@ -187,6 +187,14 @@ class CodeWriter:
       return operator_2_optype_map[operator]
     raise Exception(f'not find op_type. invalid operator {operator}')
   
+  def _convert_to_cpu_segment(self, segment):
+    cpu_segment_map = {'local': "LCL", 'argument': 'ARG',
+                       'this': "THIS", 'that': 'THAT',
+                       'temp': "5"}
+    if segment in cpu_segment_map:
+      return cpu_segment_map[segment]
+    raise Exception(f'invalid segment {segment}')
+  
   def _write_two_operand_arithmetic(self, operator):
     op_type = self._convert_to_op_type(operator)
     asm = ''
@@ -201,7 +209,10 @@ class CodeWriter:
     asm += 'M=M-1\n'
     asm += '@SP\n'
     asm += 'A=M\n'
-    asm += f'M=D{op_type}M\n'
+    if op_type == '-':
+      asm += f'M=M{op_type}D\n'
+    else:
+      asm += f'M=D{op_type}M\n'
 
     asm += '\n'
     asm += '@SP\n'
@@ -256,10 +267,11 @@ class CodeWriter:
     return asm
   
   def _push_segment_index(self, segment, index):
+    cpu_segment = self._convert_to_cpu_segment(segment)
     asm = ''
     asm += f'@{index}\n'
     asm += 'D=A\n'
-    asm += f'@{segment}\n'
+    asm += f'@{cpu_segment}\n'
     asm += 'A=D+M\n'
     asm += 'D=M\n'
 
@@ -274,6 +286,7 @@ class CodeWriter:
     return asm
 
   def _pop_segment_index(self, segment, index):
+    cpu_segment = self._convert_to_cpu_segment(segment)
     asm = ''
     asm += '@SP\n'
     asm += 'M=M-1\n'
@@ -281,7 +294,7 @@ class CodeWriter:
     asm += '\n'
     asm += f'@{index}\n'
     asm += 'D=A\n'
-    asm += f'@{segment}\n'
+    asm += f'@{cpu_segment}\n'
     asm += 'A=D+M\n'
     asm += 'D=A\n'
     asm += '@R13\n'
@@ -299,10 +312,11 @@ class CodeWriter:
     return asm
   
   def _push_static_segment(self, segment, index):
+    cpu_segment = self._convert_to_cpu_segment(segment)
     asm = ''
     asm += f'@{index}\n'
     asm += 'D=A\n'
-    asm += f'@{segment}\n'
+    asm += f'@{cpu_segment}\n'
     asm += 'A=D+A\n'
     asm += 'D=M\n'
 
@@ -317,6 +331,7 @@ class CodeWriter:
     return asm
 
   def _pop_static_segment(self, segment, index):
+    cpu_segment = self._convert_to_cpu_segment(segment)
     asm = ''
     asm += '@SP\n'
     asm += 'M=M-1\n'
@@ -324,7 +339,7 @@ class CodeWriter:
     asm += '\n'
     asm += f'@{index}\n'
     asm += 'D=A\n'
-    asm += f'@{segment}\n'
+    asm += f'@{cpu_segment}\n'
     asm += 'A=D+A\n'
     asm += 'D=A\n'
     asm += '@R13\n'
