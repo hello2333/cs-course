@@ -147,12 +147,15 @@ class CodeWriter:
   def write_push_pop(self, origin_line, command_type, segment, index):
     asm = self._write_comment(origin_line)
 
-    dynamic_segment = {'local', 'argument', 'temp', 'this', 'that', 'static'}
+    dynamic_segment = {'local', 'argument', 'this', 'that'}
+    static_segment = {'temp', 'static'}
     point_segment = {'point'}
     constant_segment = {"constant"}
     if command_type == CommandType.C_PUSH:
       if segment in dynamic_segment:
         asm += self._push_segment_index(segment, index)
+      elif segment in static_segment:
+        asm += self._push_static_segment(segment, index)
       elif segment in point_segment:
         asm += self._push_point_index(index)
       elif segment in constant_segment:
@@ -162,6 +165,8 @@ class CodeWriter:
     elif command_type == CommandType.C_POP:
       if segment in dynamic_segment:
         asm += self._pop_segment_index(segment, index)
+      elif segment in static_segment:
+        asm += self._pop_static_segment(segment, index)
       elif segment in point_segment:
         asm += self._pop_point_index(index)
       else:
@@ -246,39 +251,34 @@ class CodeWriter:
     asm += 'M=-1\n'
 
     asm += '\n'
-    asm += '(UPDATE_SP)\n'
     asm += '@SP\n'
     asm += 'M=M+1\n'
     return asm
   
   def _push_segment_index(self, segment, index):
     asm = ''
-    asm += '// read RAM[{segment} + {index}]\n'
     asm += f'@{index}\n'
     asm += 'D=A\n'
     asm += f'@{segment}\n'
     asm += 'A=D+M\n'
     asm += 'D=M\n'
-    asm += '\n'
 
-    asm += '// write RAM[SP]\n'
+    asm += '\n'
     asm += '@SP\n'
     asm += 'A=M\n'
     asm += 'M=D\n'
 
     asm += '\n'
-    asm += '// update SP\n'
     asm += '@SP\n'
     asm += 'M=M+1\n'
     return asm
 
   def _pop_segment_index(self, segment, index):
     asm = ''
-    asm += '// update SP\n'
     asm += '@SP\n'
     asm += 'M=M-1\n'
+
     asm += '\n'
-    asm += '// compute {segment} + {index} \n'
     asm += f'@{index}\n'
     asm += 'D=A\n'
     asm += f'@{segment}\n'
@@ -286,13 +286,56 @@ class CodeWriter:
     asm += 'D=A\n'
     asm += '@R13\n'
     asm += 'M=D\n'
+
     asm += '\n'
-    asm += '// read RAM[SP]\n'
     asm += '@SP\n'
     asm += 'A=M\n'
     asm += 'D=M\n'
+
     asm += '\n'
-    asm += '// write RAM[{segment} + {index}] \n'
+    asm += '@R13\n'
+    asm += 'A=M\n'
+    asm += 'M=D\n'
+    return asm
+  
+  def _push_static_segment(self, segment, index):
+    asm = ''
+    asm += f'@{index}\n'
+    asm += 'D=A\n'
+    asm += f'@{segment}\n'
+    asm += 'A=D+A\n'
+    asm += 'D=M\n'
+
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'M=D\n'
+
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'M=M+1\n'
+    return asm
+
+  def _pop_static_segment(self, segment, index):
+    asm = ''
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+
+    asm += '\n'
+    asm += f'@{index}\n'
+    asm += 'D=A\n'
+    asm += f'@{segment}\n'
+    asm += 'A=D+A\n'
+    asm += 'D=A\n'
+    asm += '@R13\n'
+    asm += 'M=D\n'
+
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'D=M\n'
+
+    asm += '\n'
     asm += '@R13\n'
     asm += 'A=M\n'
     asm += 'M=D\n'
@@ -334,7 +377,7 @@ class CodeWriter:
 
   def _push_constant_value(self, value):
     asm = ''
-    asm += '@constant\n'
+    asm += f'@{value}\n'
     asm += 'D=A\n'
     asm += '\n'
     asm += '@SP\n'
