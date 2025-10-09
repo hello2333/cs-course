@@ -126,6 +126,7 @@ class Parser:
 
 class CodeWriter:
   def __init__(self):
+    self._compare_index = 0
     pass
 
   def write_arithmetic(self, origin_line, operator):
@@ -149,7 +150,7 @@ class CodeWriter:
 
     dynamic_segment = {'local', 'argument', 'this', 'that'}
     static_segment = {'temp', 'static'}
-    point_segment = {'point'}
+    point_segment = {'pointer'}
     constant_segment = {"constant"}
     if command_type == CommandType.C_PUSH:
       if segment in dynamic_segment:
@@ -193,7 +194,7 @@ class CodeWriter:
                        'temp': "5"}
     if segment in cpu_segment_map:
       return cpu_segment_map[segment]
-    raise Exception(f'invalid segment {segment}')
+    return segment
   
   def _write_two_operand_arithmetic(self, operator):
     op_type = self._convert_to_op_type(operator)
@@ -232,6 +233,9 @@ class CodeWriter:
     asm += 'M=M+1\n'
     return asm
 
+  def _update_compare_index(self):
+    self._compare_index += 1
+
   def _write_compare_arithmetic(self, operator):
     op_type = self._convert_to_op_type(operator)
     asm = ''
@@ -239,31 +243,35 @@ class CodeWriter:
     asm += 'M=M-1\n'
     asm += 'A=M\n'
     asm += 'D=M\n'
+
     asm += '\n'
     asm += '@SP\n'
     asm += 'M=M-1\n'
     asm += 'A=M\n'
-    asm += 'M=D-M\n'
+    asm += 'M=M-D\n'
     asm += 'D=M\n'
 
     asm += '\n'
-    asm += '@MATCH\n'
+    asm += f'@MATCH_{self._compare_index}\n'
     asm += f'D;{op_type}\n'
     asm += '@SP\n'
     asm += 'A=M\n'
     asm += 'M=0\n'
-    asm += '@UPDATE_SP\n'
+    asm += f'@UPDATE_SP_{self._compare_index}\n'
     asm += '0;JMP\n'
 
     asm += '\n'
-    asm += '(MATCH)\n'
+    asm += f'(MATCH_{self._compare_index})\n'
     asm += '@SP\n'
     asm += 'A=M\n'
     asm += 'M=-1\n'
 
     asm += '\n'
+    asm += f'(UPDATE_SP_{self._compare_index})\n'
     asm += '@SP\n'
     asm += 'M=M+1\n'
+
+    self._update_compare_index()
     return asm
   
   def _push_segment_index(self, segment, index):
@@ -362,7 +370,6 @@ class CodeWriter:
       op_type = 'THAT'
     asm = ''
     asm += f'@{op_type}\n'
-    asm += 'A=M\n'
     asm += 'D=M\n'
     asm += '\n'
     asm += '@SP\n'
@@ -386,7 +393,6 @@ class CodeWriter:
     asm += 'D=M\n'
     asm += '\n'
     asm += f'@{op_type}\n'
-    asm += 'A=M\n'
     asm += 'M=D\n'
     return asm
 
@@ -449,11 +455,11 @@ print(read_file_name, write_file_name)
 
 vm_lines = 0
 with open(write_file_name, 'w', encoding='utf-8') as write_f:
+  writer = CodeWriter()
   with open(read_file_name, 'r', encoding='utf-8') as read_f:
     for line in read_f:
       # initiate parser for current line
       parser = Parser(line)
-      writer = CodeWriter()
       asm = ''
       if parser.is_comment():
         continue
