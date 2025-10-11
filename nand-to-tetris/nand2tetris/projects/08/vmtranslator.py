@@ -1,5 +1,18 @@
 from enum import Enum
 import sys
+import os
+
+def extract_name(path: str) -> str:
+    """
+    从绝对或相对路径中提取不带路径和最后一个后缀的文件名。
+    例如: "ProgramFlow/BasicLoop/BasicLoop.vm" -> "BasicLoop"
+    """
+    if not path:
+        return ""
+    p = path.strip()               # 去掉首尾空白（包括换行）
+    base = os.path.basename(p)     # 取最后一段（文件名）
+    name, _ext = os.path.splitext(base)  # 去掉最后一个后缀
+    return name
 
 class CommandType(Enum):
   C_INVALID = 0
@@ -46,19 +59,19 @@ class Parser:
     return self._command_type == CommandType.C_LABLE
   
   def is_goto(self):
-    return self.command_type == CommandType.C_GOTO
+    return self._command_type == CommandType.C_GOTO
   
   def is_if(self):
-    return self.command_type == CommandType.C_IF
+    return self._command_type == CommandType.C_IF
   
   def is_function(self):
-    return self.command_type == CommandType.C_FUNCTION
+    return self._command_type == CommandType.C_FUNCTION
   
   def is_call(self):
-    return self.command_type == CommandType.C_CALL
+    return self._command_type == CommandType.C_CALL
   
   def is_return(self):
-    return self.command_type == CommandType.C_RETURN
+    return self._command_type == CommandType.C_RETURN
   
   def is_comment(self):
     return self._command_type == CommandType.C_COMMENT
@@ -96,10 +109,15 @@ class Parser:
     if self._is_skip_line():
       return
   
-    self._line = self._line.strip()
+    line_parts = self._line.strip().split('//')
+    if len(line_parts) < 1:
+      raise Exception(f'invalid command: {line}, line_parts={line_parts}')
+
+    self._line = line_parts[0].strip()
     command_parts = self._line.split(' ')
     if len(command_parts) < 1:
       raise Exception(f'invalid command: {line}')
+
     command = command_parts[0]
     self._command_type = self._get_command_type(command)
     if self.is_arithmetic():
@@ -119,7 +137,7 @@ class Parser:
     elif self.is_return():
       self._parse_return(command_parts)
     else:
-      raise Exception(f'not support command {command} now')
+      raise Exception(f'not support command {command} now, {self._line}')
     pass
 
   def _parse_arithmetic(self, command_parts):
@@ -203,11 +221,10 @@ class CodeWriter:
     pass
 
   def set_filename(self, filename):
-    self._filename = filename
+    self._filename = extract_name(filename)
 
-  def write_arithmetic(self, origin_line, operator):
-    asm = self.write_comment(origin_line)
-
+  def write_arithmetic(self, operator):
+    asm = ''
     two_operand_command = {'add', 'sub', 'and', 'or'}
     one_operand_command = {'neg', 'not'}
     compare_command = {'eq', 'lt', 'gt'}
@@ -221,9 +238,8 @@ class CodeWriter:
       raise Exception(f'invalid arithmetic: {operator}')
     return asm
 
-  def write_push_pop(self, origin_line, command_type, segment, index):
-    asm = self.write_comment(origin_line)
-
+  def write_push_pop(self, command_type, segment, index):
+    asm = ''
     dynamic_segment = {'local', 'argument', 'this', 'that'}
     static_segment = {'temp', 'static'}
     point_segment = {'pointer'}
@@ -488,7 +504,7 @@ class CodeWriter:
   def write_label(self, label):
     inject_label = self._gen_label(label)
     asm = ''
-    asm += f'({inject_label})'
+    asm += f'({inject_label})\n'
     return asm
 
   def write_goto(self, label):
@@ -503,13 +519,10 @@ class CodeWriter:
     inject_label = self._gen_label(label)
 
     asm += '@SP\n'
-    asm += 'A=M\n'
-    asm += 'D=M\n'
-    asm += '@cond\n'
-    asm += 'M=D\n'
-    asm += '@SP\n'
     asm += 'M=M-1\n'
-    asm += '@cond\n'
+
+    asm += '@SP\n'
+    asm += 'A=M\n'
     asm += 'D=M\n'
     asm += f'@{inject_label}\n'
     asm += 'D;JNE\n'
@@ -517,7 +530,7 @@ class CodeWriter:
 
   def write_function(self, func_name, arg_count):
     func_label = self._gen_function_label(func_name)
-    asm = f'({func_label})'
+    asm = f'({func_label})\n'
 
     self._init_func_context(func_name)
     return asm
@@ -735,9 +748,9 @@ with open(write_file_name, 'w', encoding='utf-8') as write_f:
       write_f.write(asm)
 
       if parser.is_push_pop():
-        asm = writer.write_push_pop(parser.origin_line(), parser.command_type(), parser.arg1(), parser.arg2())
+        asm = writer.write_push_pop(parser.command_type(), parser.arg1(), parser.arg2())
       elif parser.is_arithmetic():
-        asm = writer.write_arithmetic(parser.origin_line(), parser.arg1())
+        asm = writer.write_arithmetic(parser.arg1())
       elif parser.is_label():
         asm = writer.write_label(parser.arg1())
       elif parser.is_goto():
