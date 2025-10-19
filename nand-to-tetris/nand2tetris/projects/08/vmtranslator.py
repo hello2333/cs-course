@@ -220,6 +220,17 @@ class CodeWriter:
     self._curr_func_ret_index = 0
     pass
 
+  def write_bootstrap(self):
+    asm = ''
+    asm += '@256\n'
+    asm += 'D=A\n'
+    asm += '@SP\n'
+    asm += 'M=D\n'
+    asm += '\n'
+
+    asm += self.write_call('Sys.init', '0') + '\n'
+    return asm
+
   def set_filename(self, filename):
     self._filename = extract_name(filename)
 
@@ -419,8 +430,8 @@ class CodeWriter:
     asm += f'@{cpu_segment}\n'
     asm += 'A=D+A\n'
     asm += 'D=M\n'
-
     asm += '\n'
+
     asm += '@SP\n'
     asm += 'A=M\n'
     asm += 'M=D\n'
@@ -537,40 +548,51 @@ class CodeWriter:
 
   def write_call(self, callee_func_name, arg_count):
     asm = ''
-    asm += self._call_store_caller_retaddr(self._curr_func_name, self._curr_func_ret_index)
-    asm += self._call_store_caller_segments()
-    asm += self._call_set_callee_arg(arg_count)
-    asm += self._call_set_callee_lcl()
-    asm += self._call_goto_callee(callee_func_name)
-    asm += self._call_inject_caller_retaddr_label(self._curr_func_name, self._curr_func_ret_index)
+    # store caller context
+    asm += self._call_store_caller_retaddr(self._curr_func_name, self._curr_func_ret_index) + '\n'
+    asm += self._call_store_caller_segments() + '\n'
+    # update callee context
+    asm += self._call_set_callee_arg(arg_count) + '\n'
+    asm += self._call_set_callee_lcl() + '\n'
+    # goto callee
+    asm += self._call_goto_callee(callee_func_name) + '\n'
+    # goback caller
+    asm += self._call_inject_caller_retaddr_label(self._curr_func_name, self._curr_func_ret_index) + '\n'
 
     self._forword_func_ret_index()
     return asm
 
   def write_return(self):
     asm = ''
-    asm += self._return_set_endframe()
-    asm += self._return_recover_caller_retaddr()
-    asm += self._return_set_ret_value()
-    asm += self._return_set_caller_sp()
-    asm += self._return_recover_caller_segments()
+    asm += (self._return_set_endframe() + '\n')
+    asm += (self._return_recover_caller_retaddr() + '\n')
+    # set return value
+    asm += (self._return_set_ret_value() + '\n')
+    # update sp
+    asm += (self._return_set_caller_sp() + '\n')
+    # recover segments
+    asm += (self._return_recover_caller_segments() + '\n')
+    # goback caller
+    asm += self._return_goback_caller() + '\n'
 
-    self._clear_func_context()
+    # self._clear_func_context()
     return asm
 
   # Xxx.functionName$ret.i
   def _gen_ret_label(self, caller_func, ret_index):
-    return f'{self._filename}.{caller_func}$ret.{ret_index}'
+    if len(caller_func) == 0:
+      return f'ret.{ret_index}'
+    return f'{caller_func}$ret.{ret_index}'
   
   # Xxx.functionName
   def _gen_function_label(self, func_name):
-    return f'{self._filename}.{func_name}'
+    return f'{func_name}'
 
   # Xxx.functionName$label or Xxx$label
   def _gen_label(self, label):
     if len(self._curr_func_name) > 0:
-      return f'{self._filename}.{self._curr_func_name}${label}'
-    return f'{self._filename}${label}'
+      return f'{self._curr_func_name}${label}'
+    return f'{label}'
   
   def _init_func_context(self, func_name):
     self._curr_func_name = func_name
@@ -598,19 +620,21 @@ class CodeWriter:
 
   def _call_store_caller_segments(self):
     asm = ''
-    asm += self._call_store_caller_segment('LCL')
-    asm += self._call_store_caller_segment('ARG')
-    asm += self._call_store_caller_segment('THIS')
-    asm += self._call_store_caller_segment('THAT')
+    asm += self._call_store_caller_segment('LCL') + '\n'
+    asm += self._call_store_caller_segment('ARG') + '\n'
+    asm += self._call_store_caller_segment('THIS') + '\n'
+    asm += self._call_store_caller_segment('THAT') + '\n'
     return asm
 
   def _call_store_caller_segment(self, segment):
     asm = ''
-    asm += '@segment\n'
+    # RAM[*SP] = RAM[segment]
+    asm += f'@{segment}\n'
     asm += 'D=M\n'
     asm += '@SP\n'
     asm += 'A=M\n'
     asm += 'M=D\n'
+    # RAM[SP] = RAM[SP] + 1
     asm += '@SP\n'
     asm += 'M=M+1\n'
     return asm
@@ -622,14 +646,16 @@ class CodeWriter:
     asm += 'D=M\n'
     asm += '@ARG\n'
     asm += 'M=D\n'
+
     asm += '// ARG = ARG -5\n'
     asm += '@5\n'
     asm += 'D=A\n'
     asm += '@ARG\n'
     asm += 'M=M-D\n'
+  
     asm += '// ARG = ARG - nArgs\n'
     asm += f'@{args_count}\n'
-    asm += 'D=M\n'
+    asm += 'D=A\n'
     asm += '@ARG\n'
     asm += 'M=M-D\n'
     return asm
@@ -656,7 +682,7 @@ class CodeWriter:
     return asm
 
   def _return_set_endframe(self):
-    asm = ''
+    asm = '// set endFrame\n'
     asm += '@LCL\n'
     asm += 'D=M\n'
     asm += '@endFrame\n'
@@ -664,7 +690,7 @@ class CodeWriter:
     return asm
 
   def _return_recover_caller_retaddr(self):
-    asm = ''
+    asm = '// get caller retaddr\n'
     asm += '@5\n'
     asm += 'D=A\n'
     asm += '@endFrame\n'
@@ -675,7 +701,11 @@ class CodeWriter:
     return asm
 
   def _return_set_ret_value(self):
-    asm = ''
+    asm = '// set ret value in ret addr\n'
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+    asm += '\n'
+
     asm += '@SP\n'
     asm += 'A=M\n'
     asm += 'D=M\n'
@@ -685,7 +715,7 @@ class CodeWriter:
     return asm
 
   def _return_set_caller_sp(self):
-    asm = ''
+    asm = '// set caller sp\n'
     asm += '@ARG\n'
     asm += 'D=M\n'
     asm += '@SP\n'
@@ -704,15 +734,15 @@ class CodeWriter:
     return asm
 
   def _return_recover_caller_segments(self):
-    asm = ''
-    asm += self._return_recover_caller_segment('THAT', 1)
-    asm += self._return_recover_caller_segment('THIS', 1)
-    asm += self._return_recover_caller_segment('ARG', 1)
-    asm += self._return_recover_caller_segment('LCL', 1)
+    asm = '// recover_caller_segments\n'
+    asm += self._return_recover_caller_segment('THAT', 1) + '\n'
+    asm += self._return_recover_caller_segment('THIS', 2) + '\n'
+    asm += self._return_recover_caller_segment('ARG', 3) + '\n'
+    asm += self._return_recover_caller_segment('LCL', 4) + '\n'
     return asm
 
   def _return_goback_caller(self):
-    asm = ''
+    asm = '// goback caller\n'
     asm += '@retAddr\n'
     asm += 'A=M\n'
     asm += '0;JMP\n'
@@ -722,50 +752,142 @@ class CodeWriter:
 # 伪代码只做流程层面的事情，对抽象的函数进行调用。不应该有细节的的东西
 # 省略了第一次写的伪代码
 
-# Process 2025.10.08
-# check param
-if len(sys.argv) != 2:
-  print("Usuage: python vmtranslator.py file_absolute_name")
-  exit(0)
+# Process 2025.10.11 支持处理文件夹下的文件
+def process_vm_file(vm_file_path, code_writer, output_file):
+  output_file.write(f'// {vm_file_path}\n')
 
-read_file_name = sys.argv[1]
-write_file_name = read_file_name.replace("vm", "asm")
-print(read_file_name, write_file_name)
-
-vm_lines = 0
-with open(write_file_name, 'w', encoding='utf-8') as write_f:
-  writer = CodeWriter()
-  with open(read_file_name, 'r', encoding='utf-8') as read_f:
-    writer.set_filename(read_file_name)
-    for line in read_f:
+  vm_lines = 0
+  with open(vm_file_path, 'r', encoding='utf-8') as vm_f:
+    code_writer.set_filename(vm_file_path)
+    for line in vm_f:
       # initiate parser for current line
       parser = Parser(line)
       asm = ''
       if parser.is_comment():
         continue
       
-      asm = writer.write_comment(parser.origin_line())
-      write_f.write(asm)
+      asm = code_writer.write_comment(parser.origin_line())
+      output_file.write(asm)
 
       if parser.is_push_pop():
-        asm = writer.write_push_pop(parser.command_type(), parser.arg1(), parser.arg2())
+        asm = code_writer.write_push_pop(parser.command_type(), parser.arg1(), parser.arg2())
       elif parser.is_arithmetic():
-        asm = writer.write_arithmetic(parser.arg1())
+        asm = code_writer.write_arithmetic(parser.arg1())
       elif parser.is_label():
-        asm = writer.write_label(parser.arg1())
+        asm = code_writer.write_label(parser.arg1())
       elif parser.is_goto():
-        asm = writer.write_goto(parser.arg1())
+        asm = code_writer.write_goto(parser.arg1())
       elif parser.is_if():
-        asm = writer.write_if(parser.arg1())
+        asm = code_writer.write_if(parser.arg1())
       elif parser.is_function():
-        asm = writer.write_function(parser.arg1(), parser.arg2())
+        asm = code_writer.write_function(parser.arg1(), parser.arg2())
       elif parser.is_call():
-        asm = writer.write_call(parser.arg1(), parser.arg2())
+        asm = code_writer.write_call(parser.arg1(), parser.arg2())
       elif parser.is_return():
-        asm = writer.write_return()
+        asm = code_writer.write_return()
       else:
         raise Exception(f'Not support command {parser.origin_line()}, command_type={parser.command_type()} now')
+      output_file.write(asm)
       vm_lines += 1
-      write_f.write(asm)
+    
+  print(f"Processed: {vm_file_path} ({vm_lines} lines)")
 
-print(f'success. handle lines {vm_lines}')
+def main():
+  # 获取输入参数
+  if len(sys.argv) != 2:
+    print("Usage: python vm_processor.py <path>")
+    sys.exit(1)
+    
+  path = sys.argv[1]
+    
+  # 检查路径是否存在
+  if not os.path.exists(path):
+      print(f"Error: Path '{path}' does not exist")
+      sys.exit(1)
+  
+  # 确定输出文件路径
+  if os.path.isdir(path):
+    output_path = os.path.join(path, "out.asm")
+    search_path = path
+  else:
+    # 如果是文件，输出文件放在同一目录
+    output_path = os.path.join(os.path.dirname(path), "out.asm")
+    search_path = os.path.dirname(path) if os.path.dirname(path) else "."
+  
+  with open(output_path, 'w', encoding='utf-8') as output_file:
+    # 写入文件头
+    code_writer = CodeWriter()
+    boostrap_asm = code_writer.write_bootstrap()
+    output_file.write(boostrap_asm)
+    
+    if os.path.isdir(path):
+      # 处理目录下的所有.vm文件
+      vm_files = []
+      for file in os.listdir(path):
+        if file.endswith('.vm'):
+          vm_files.append(os.path.join(path, file))
+      
+      if not vm_files:
+        print("No .vm files found in the directory")
+        output_file.write("// No .vm files found in directory\n")
+        return
+      
+      # 按文件名排序处理
+      vm_files.sort()
+      for vm_file in vm_files:
+        process_vm_file(vm_file, code_writer, output_file)
+              
+    else:
+      # 处理单个文件
+      if path.endswith('.vm'):
+          process_vm_file(path, code_writer, output_file)
+      else:
+          print("Error: Input file is not a .vm file")
+          output_file.write("// Error: Input file is not a .vm file\n")
+    
+    print(f"Output generated: {output_path}")
+
+if __name__ == "__main__":
+    main()
+
+# Process 2025.10.08 只能处理单个文件
+# vm_lines = 0
+# with open(write_file_name, 'w', encoding='utf-8') as write_f:
+#   writer = CodeWriter()
+#   boostrap_asm = writer.write_bootstrap()
+#   write_f.write(boostrap_asm)
+
+#   with open(read_file_name, 'r', encoding='utf-8') as read_f:
+#     writer.set_filename(read_file_name)
+#     for line in read_f:
+#       # initiate parser for current line
+#       parser = Parser(line)
+#       asm = ''
+#       if parser.is_comment():
+#         continue
+      
+#       asm = writer.write_comment(parser.origin_line())
+#       write_f.write(asm)
+
+#       if parser.is_push_pop():
+#         asm = writer.write_push_pop(parser.command_type(), parser.arg1(), parser.arg2())
+#       elif parser.is_arithmetic():
+#         asm = writer.write_arithmetic(parser.arg1())
+#       elif parser.is_label():
+#         asm = writer.write_label(parser.arg1())
+#       elif parser.is_goto():
+#         asm = writer.write_goto(parser.arg1())
+#       elif parser.is_if():
+#         asm = writer.write_if(parser.arg1())
+#       elif parser.is_function():
+#         asm = writer.write_function(parser.arg1(), parser.arg2())
+#       elif parser.is_call():
+#         asm = writer.write_call(parser.arg1(), parser.arg2())
+#       elif parser.is_return():
+#         asm = writer.write_return()
+#       else:
+#         raise Exception(f'Not support command {parser.origin_line()}, command_type={parser.command_type()} now')
+#       vm_lines += 1
+#       write_f.write(asm)
+
+# print(f'success. handle lines {vm_lines}')
