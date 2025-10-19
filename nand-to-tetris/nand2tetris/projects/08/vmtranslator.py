@@ -258,8 +258,10 @@ class CodeWriter:
     if command_type == CommandType.C_PUSH:
       if segment in dynamic_segment:
         asm += self._push_segment_index(segment, index)
-      elif segment in static_segment:
+      elif segment == 'static':
         asm += self._push_static_segment(segment, index)
+      elif segment == 'temp':
+        asm += self._push_temp_segment(segment, index)
       elif segment in point_segment:
         asm += self._push_point_index(index)
       elif segment in constant_segment:
@@ -269,8 +271,10 @@ class CodeWriter:
     elif command_type == CommandType.C_POP:
       if segment in dynamic_segment:
         asm += self._pop_segment_index(segment, index)
-      elif segment in static_segment:
+      elif segment == 'static':
         asm += self._pop_static_segment(segment, index)
+      elif segment == 'temp':
+        asm += self._pop_temp_segment(segment, index)
       elif segment in point_segment:
         asm += self._pop_point_index(index)
       else:
@@ -423,6 +427,38 @@ class CodeWriter:
     return asm
   
   def _push_static_segment(self, segment, index):
+    static_label = self._gen_static_lable(index)
+    asm = ''
+    asm += f'@{static_label} \n'
+    asm += 'D=M \n'
+    asm += '\n'
+
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'M=D\n'
+
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'M=M+1\n'
+    return asm
+
+  def _pop_static_segment(self, segment, index):
+    static_label = self._gen_static_lable(index)
+    asm = ''
+    asm += '@SP\n'
+    asm += 'M=M-1\n'
+
+    asm += '\n'
+    asm += '@SP\n'
+    asm += 'A=M\n'
+    asm += 'D=M\n'
+
+    asm += '\n'
+    asm += f'@{static_label}\n'
+    asm += 'M=D\n'
+    return asm
+  
+  def _push_temp_segment(self, segment, index):
     cpu_segment = self._convert_to_cpu_segment(segment)
     asm = ''
     asm += f'@{index}\n'
@@ -441,7 +477,7 @@ class CodeWriter:
     asm += 'M=M+1\n'
     return asm
 
-  def _pop_static_segment(self, segment, index):
+  def _pop_temp_segment(self, segment, index):
     cpu_segment = self._convert_to_cpu_segment(segment)
     asm = ''
     asm += '@SP\n'
@@ -593,6 +629,9 @@ class CodeWriter:
     if len(self._curr_func_name) > 0:
       return f'{self._curr_func_name}${label}'
     return f'{label}'
+  
+  def _gen_static_lable(self, index):
+    return f'{self._filename}$static.{index}'
   
   def _init_func_context(self, func_name):
     self._curr_func_name = func_name
