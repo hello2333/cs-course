@@ -575,11 +575,13 @@ class CodeWriter:
     asm += 'D;JNE\n'
     return asm
 
-  def write_function(self, func_name, arg_count):
+  def write_function(self, func_name, lcl_count):
+    self._init_func_context(func_name)
+
     func_label = self._gen_function_label(func_name)
     asm = f'({func_label})\n'
+    asm += self._function_init_local(lcl_count)
 
-    self._init_func_context(func_name)
     return asm
 
   def write_call(self, callee_func_name, arg_count):
@@ -644,6 +646,52 @@ class CodeWriter:
   def _forword_func_ret_index(self):
     self._curr_func_ret_index += 1
  
+  def _function_init_local(self, local_num):
+    asm = ''
+    asm += '// RAM[index] = 3\n'
+    asm += f'@{local_num}\n'
+    asm += 'D=A\n'
+    asm += '@origin_index\n'
+    asm += 'M=D\n'
+    asm += '@index\n'
+    asm += 'M=D\n'
+    asm += '\n'
+
+    asm += '// if index <= 0: goto LOOP_END\n'
+    asm += f'({self._curr_func_name}.LOOP_INIT_LCL)\n'
+    asm += '@index\n'
+    asm += 'D=M\n'
+    asm += f'@{self._curr_func_name}.LOOP_END\n'
+    asm += 'D;JLE\n'
+    asm += '\n'
+
+    asm += '// RAM[index] = RAM[index] - 1\n'
+    asm += '@index\n'
+    asm += 'M=M-1\n'
+    asm += 'D=M\n'
+    asm += '\n'
+
+    asm += '// RAM[*(LCL)+index] = 0\n'
+    asm += '@LCL\n'
+    asm += 'A=D+M\n'
+    asm += 'M=0\n'
+    asm += '\n'
+
+    asm += f'@{self._curr_func_name}.LOOP_INIT_LCL\n'
+    asm += '0;JMP\n'
+    asm += '\n'
+
+    asm += f'({self._curr_func_name}.LOOP_END)\n'
+  
+    asm += '// RAM[*SP] = RAM[*LCL] + RAM[index]\n'
+    asm += '@origin_index\n'
+    asm += 'D=M\n'
+    asm += '@LCL\n'
+    asm += 'D=D+M\n'
+    asm += '@SP\n'
+    asm += 'M=D\n'
+    return asm
+  
   def _call_store_caller_retaddr(self, caller_func, ret_index):
     asm = ''
     ret_label = self._gen_ret_label(caller_func, ret_index)
@@ -856,10 +904,11 @@ def main():
   with open(output_path, 'w', encoding='utf-8') as output_file:
     # 写入文件头
     code_writer = CodeWriter()
-    boostrap_asm = code_writer.write_bootstrap()
-    output_file.write(boostrap_asm)
     
     if os.path.isdir(path):
+      boostrap_asm = code_writer.write_bootstrap()
+      output_file.write(boostrap_asm)
+
       # 处理目录下的所有.vm文件
       vm_files = []
       for file in os.listdir(path):
